@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Plugin Compiler</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0; min-height: 100vh; padding: 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { text-align: center; padding: 40px 0; }
+        header h1 {
+            font-size: 2.5em; color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.3); margin-bottom: 10px;
+        }
+        header p { color: #8892b0; font-size: 1.1em; }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px; padding: 30px; margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+        .upload-area {
+            border: 2px dashed #00d4ff; border-radius: 12px;
+            padding: 40px; text-align: center; cursor: pointer;
+            transition: all 0.3s ease; background: rgba(0, 212, 255, 0.05);
+        }
+        .upload-area:hover { background: rgba(0, 212, 255, 0.1); transform: translateY(-2px); }
+        .upload-area.dragover { background: rgba(0, 212, 255, 0.2); border-color: #00ff88; }
+        .upload-icon { font-size: 3em; margin-bottom: 15px; }
+        .file-list { margin-top: 20px; }
+        .file-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 15px; background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px; margin-bottom: 8px; border-left: 3px solid #00d4ff;
+        }
+        .file-name { color: #ccd6f6; font-weight: 500; }
+        .file-size { color: #8892b0; font-size: 0.9em; }
+        .btn {
+            padding: 12px 30px; border: none; border-radius: 8px;
+            font-size: 1em; font-weight: 600; cursor: pointer;
+            transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+            color: white; width: 100%; margin-top: 20px;
+        }
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
+        }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-success {
+            background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
+            color: #1a1a2e; width: 100%; margin-top: 10px;
+        }
+        .logs {
+            background: #0a0a0a; border-radius: 12px; padding: 20px;
+            font-family: 'Courier New', monospace; font-size: 0.9em;
+            max-height: 400px; overflow-y: auto; margin-top: 20px; border: 1px solid #333;
+        }
+        .logs-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #333;
+        }
+        .logs-title { color: #00d4ff; font-weight: bold; }
+        .log-line { padding: 3px 0; color: #a8b2d1; line-height: 1.5; }
+        .log-error { color: #ff6b6b; }
+        .log-success { color: #00ff88; }
+        .log-info { color: #ffd93d; }
+        .hidden { display: none !important; }
+        .spinner {
+            display: inline-block; width: 20px; height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%;
+            border-top-color: #00d4ff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px; vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .status-badge {
+            display: inline-block; padding: 5px 15px;
+            border-radius: 20px; font-size: 0.85em; font-weight: 600; margin-bottom: 15px;
+        }
+        .status-waiting { background: rgba(255, 217, 61, 0.2); color: #ffd93d; }
+        .status-compiling { background: rgba(0, 212, 255, 0.2); color: #00d4ff; }
+        .status-success { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
+        .status-error { background: rgba(255, 107, 107, 0.2); color: #ff6b6b; }
+        .info-box {
+            background: rgba(0, 212, 255, 0.1); border-left: 4px solid #00d4ff;
+            padding: 15px; border-radius: 0 8px 8px 0; margin-bottom: 20px;
+        }
+        .info-box h3 { color: #00d4ff; margin-bottom: 8px; }
+        .info-box ul { list-style: none; padding-left: 0; }
+        .info-box li { padding: 5px 0; color: #a8b2d1; }
+        .info-box li::before { content: "▸ "; color: #00d4ff; }
+        #fileInput { display: none; }
+        .progress-bar {
+            width: 100%; height: 4px; background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px; margin-top: 15px; overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%; background: linear-gradient(90deg, #00d4ff, #00ff88);
+            width: 0%; transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚔️ Minecraft Plugin Compiler</h1>
+            <p>তোমার Java কোড থেকে JAR ফাইল তৈরি করো</p>
+        </header>
+
+        <div class="card">
+            <div class="info-box">
+                <h3>📋 সাপোর্টেড ফাইল:</h3>
+                <ul>
+                    <li>Java ফাইল (.java) - সরাসরি কম্পাইল</li>
+                    <li>Maven প্রোজেক্ট (pom.xml সহ)</li>
+                    <li>Gradle প্রোজেক্ট (build.gradle সহ)</li>
+                    <li>ZIP ফাইল (পুরো প্রোজেক্ট ফোল্ডার)</li>
+                </ul>
+            </div>
+
+            <div id="status" class="status-badge status-waiting">⏳ ফাইল আপলোড করুন</div>
+
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📁</div>
+                <h3>ফাইল ড্র্যাগ করো অথবা ক্লিক করো</h3>
+                <p style="color: #8892b0; margin-top: 10px;">.java, .xml, .gradle, .zip ফাইল সাপোর্টেড</p>
+                <input type="file" id="fileInput" multiple accept=".java,.xml,.gradle,.zip">
+            </div>
+
+            <div class="file-list" id="fileList"></div>
+
+            <div class="progress-bar hidden" id="progressBar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+
+            <button class="btn btn-primary hidden" id="compileBtn" onclick="compileFiles()">
+                <span id="btnText">⚡ কম্পাইল করুন</span>
+            </button>
+
+            <button class="btn btn-success hidden" id="downloadBtn" onclick="downloadJar()">
+                📥 JAR ডাউনলোড করুন
+            </button>
+        </div>
+
+        <div class="card hidden" id="logsCard">
+            <div class="logs">
+                <div class="logs-header">
+                    <span class="logs-title">🖥️ কম্পাইলেশন লগ</span>
+                    <button onclick="clearLogs()" style="background: transparent; border: 1px solid #333; color: #8892b0; padding: 5px 15px; border-radius: 5px; cursor: pointer;">Clear</button>
+                </div>
+                <div id="logsContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+        let uploadedFiles = [];
+        let currentJarUrl = null;
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const compileBtn = document.getElementById('compileBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const logsCard = document.getElementById('logsCard');
+        const logsContent = document.getElementById('logsContent');
+        const status = document.getElementById('status');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        function handleFiles(files) {
+            uploadedFiles = Array.from(files);
+            updateFileList();
+            compileBtn.classList.remove('hidden');
+            status.textContent = `📎 ${uploadedFiles.length} ফাইল সিলেক্টেড`;
+            status.className = 'status-badge status-waiting';
+        }
+
+        function updateFileList() {
+            fileList.innerHTML = '';
+            uploadedFiles.forEach(file => {
+                const div = document.createElement('div');
+                div.className = 'file-item';
+                div.innerHTML = `
+                    <span class="file-name">📄 ${file.name}</span>
+                    <span class="file-size">${formatSize(file.size)}</span>
+                `;
+                fileList.appendChild(div);
+            });
+        }
+
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function addLog(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `log-line log-${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logsContent.appendChild(div);
+            logsContent.scrollTop = logsContent.scrollHeight;
+        }
+
+        function clearLogs() {
+            logsContent.innerHTML = '';
+        }
+
+        async function compileFiles() {
+            if (uploadedFiles.length === 0) return;
+
+            const formData = new FormData();
+            uploadedFiles.forEach(file => formData.append('files', file));
+
+            compileBtn.disabled = true;
+            compileBtn.innerHTML = '<span class="spinner"></span> কম্পাইল হচ্ছে...';
+            logsCard.classList.remove('hidden');
+            progressBar.classList.remove('hidden');
+            status.textContent = '⚙️ কম্পাইল হচ্ছে...';
+            status.className = 'status-badge status-compiling';
+
+            addLog('কম্পাইলেশন শুরু হচ্ছে...', 'info');
+            addLog(`${uploadedFiles.length} ফাইল আপলোড করা হয়েছে`, 'info');
+
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress > 90) progress = 90;
+                progressFill.style.width = progress + '%';
+            }, 500);
+
+            try {
+                const response = await fetch(`${API_URL}/api/compile`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                clearInterval(progressInterval);
+                progressFill.style.width = '100%';
+
+                const data = await response.json();
+
+                if (data.success) {
+                    status.textContent = '✅ কম্পাইল সফল!';
+                    status.className = 'status-badge status-success';
+                    addLog('✅ কম্পাইলেশন সফল!', 'success');
+                    addLog(`📦 JAR ফাইল: ${data.jarUrl}`, 'success');
+
+                    currentJarUrl = data.jarUrl;
+                    downloadBtn.classList.remove('hidden');
+                    compileBtn.classList.add('hidden');
+                } else {
+                    status.textContent = '❌ কম্পাইল ফেইল্ড';
+                    status.className = 'status-badge status-error';
+                    addLog('❌ কম্পাইলেশন ব্যর্থ!', 'error');
+                }
+
+                if (data.logs) {
+                    data.logs.split('\n').forEach(line => {
+                        if (line.includes('ERROR') || line.includes('error')) {
+                            addLog(line, 'error');
+                        } else if (line.includes('SUCCESS') || line.includes('BUILD')) {
+                            addLog(line, 'success');
+                        } else {
+                            addLog(line, 'info');
+                        }
+                    });
+                }
+
+            } catch (error) {
+                clearInterval(progressInterval);
+                status.textContent = '❌ এরর হয়েছে';
+                status.className = 'status-badge status-error';
+                addLog('❌ নেটওয়ার্ক এরর: ' + error.message, 'error');
+            } finally {
+                compileBtn.disabled = false;
+                compileBtn.innerHTML = '<span id="btnText">⚡ কম্পাইল করুন</span>';
+            }
+        }
+
+        function downloadJar() {
+            if (currentJarUrl) {
+                window.open(`${API_URL}${currentJarUrl}`, '_blank');
+                addLog('📥 JAR ডাউনলোড শুরু হয়েছে', 'success');
+            }
+        }
+
+        fetch(`${API_URL}/api/health`)
+            .then(res => res.json())
+            .then(data => {
+                console.log('Server:', data);
+                addLog('🌐 সার্ভার কানেক্টেড: ' + data.message, 'success');
+            })
+            .catch(() => {
+                addLog('⚠️ সার্ভার কানেক্ট করা যাচ্ছে না!', 'error');
+            });
+    </script>
+</body>
+</html>
